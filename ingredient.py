@@ -1,24 +1,36 @@
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 
-header = {"User-Agent": "Mozilla/5.0(Windows NT 10.0; Win64; x64)"}
 url = "https://www.allrecipes.com/ingredients-a-z-6740416"
-html = requests.get(url, headers = header, timeout=10).text
-soup = BeautifulSoup(html, "html.parser")
 
-ingredients = soup.select("main ul li a")
+
+scraper = cloudscraper.create_scraper(
+    browser={
+        "browser": "chrome",
+        "platform": "windows",
+        "mobile": False
+    }
+)
+
+response = scraper.get(url, timeout=15)
+
+print("Status Code:", response.status_code)
+if response.status_code != 200:
+    print("Request failed!")
+    exit()
+
+soup = BeautifulSoup(response.text, "html.parser")
+ingredients = soup.select("main ul li a[href*='/recipes/']")
 
 for a in ingredients:
-    name = a.get_text(strip =True)
+    name = a.get_text(strip=True)
     href = a.get("href")
-    print(name,":", href)
+    print(name, ":", href)
 
-with open("data/category_links.txt","w") as f:
+with open("data/category_links.txt", "w", encoding="utf-8") as f:
     for a in ingredients:
         href = a.get("href")
         if href:
             f.write(href + "\n")
 
-
-
-
+print("Saved", len(ingredients), "category links.")
