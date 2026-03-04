@@ -1,12 +1,14 @@
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
-
+import re
 
 header= {"User-Agent": "Mozilla/5.0(Windows NT 10.0; Win64; x64)"}
+scraper = cloudscraper.create_scraper()
 
 links = set() 
 def extact_recipe_links(category_url):
-    resp = requests.get(category_url, headers=header)
+    resp = scraper.get(category_url, headers=header)
+    print("Visiting:", category_url, resp.status_code)
     soup = BeautifulSoup(resp.text,"html.parser")
     
     
@@ -30,4 +32,4 @@ with open("data/recipe_links.txt","w") as f:
     for r in all_links:
         f.write(r + "\n")
 
-
+print("Saved", len(all_links), "recipe links.")

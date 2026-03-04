@@ -1,10 +1,11 @@
-import requests
 import json
 from bs4 import BeautifulSoup
+import cloudscraper
+import re
 
 
 header= {"User-Agent": "Mozilla/5.0(Windows NT 10.0; Win64; x64)"}
-
+scraper = cloudscraper.create_scraper()
 
 
 def extract_jsonLD(html):
@@ -52,14 +53,30 @@ def parse_recipe(data,html,url):
     
     recipe["steps"] = steps
 
-# find nutrition fact
+# find nutrition fact and normalize values
 
-    nutrition_fact = {} 
+    nutrition_fact = {}
     if "nutrition" in data and isinstance(data["nutrition"], dict):
-        for key, value in data["nutrition"].items():
-            if key != "@type":
-                nutrition_fact[key] = value
-    recipe["nutrition"] =  nutrition_fact
+        for key, raw_value in data["nutrition"].items():
+            # skip the type field
+            if key == "@type":
+                continue
+
+            text_val = str(raw_value).lower()
+            # extract the first number
+            match = re.search(r"[\d.]+", text_val)
+            if not match:
+                continue
+
+            num = float(match.group())
+
+            # convert mg to g
+            if "mg" in text_val:
+                num = num / 1000.0
+
+            nutrition_fact[key] = round(num, 3)
+
+    recipe["nutrition"] = nutrition_fact
 
 
     recipe["total_time"]=data.get("totalTime","")
@@ -77,7 +94,7 @@ with open("data/recipes.jsonl", "w", encoding="utf-8") as out:
     for url in urls:
         print("extract:", url)
         try:
-            resp = requests.get(url, headers= header, timeout = 10)
+            resp = scraper.get(url, headers= header, timeout = 10)
             jsonld = extract_jsonLD(resp.text)
             if jsonld:
                 rec = parse_recipe(jsonld,resp.text, url)
