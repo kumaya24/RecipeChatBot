@@ -205,22 +205,3 @@ class RecipeSearchTool(BaseTool):
         # For true async, swap in AsyncElasticsearch and await the search call
         return self._run(**kwargs)
 
-
-# ── Wire up to an agent ───────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    from langchain.agents import AgentType, initialize_agent
-    from langchain_openai import ChatOpenAI
-
-    es = Elasticsearch("http://localhost:9200")
-    tool = RecipeSearchTool(es_client=es, index_name="recipes")
-
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
-    agent = initialize_agent(
-        tools=[tool],
-        llm=llm,
-        agent=AgentType.OPENAI_FUNCTIONS,  # structured function calling
-        verbose=True,
-    )
-
-    agent.run("Find turkey soup recipes under 300 calories with at least 15g of protein.")
