@@ -55,13 +55,13 @@ const ChatArea = () => {
     setIsTyping(true);
 
     const chatRes = await createChat(newPrompt);
-    const payload: ChatResponse = await chatRes.json()
-    let replay:string = "";
+    let replay: string = "";
 
-    if (chatRes.ok){
-      replay = payload.answer
+    if (chatRes.ok) {
+      const payload: ChatResponse = await chatRes.json();
+      replay = payload.answer;
     } else {
-      replay = "Internal Server Error"
+      replay = "ERROR: Internal Server Error";
     }
 
     const reply: Msg = {
