@@ -4,9 +4,6 @@ from langchain.tools import BaseTool
 from elasticsearch import Elasticsearch
 
 
-# ── Input Schema ──────────────────────────────────────────────────────────────
-# Flat schema — much easier for LLMs to populate reliably via function calling.
-
 class RecipeSearchInput(BaseModel):
     """Search the recipe database. All fields are optional."""
 
@@ -49,8 +46,7 @@ class RecipeSearchInput(BaseModel):
     min_sodium: Optional[float] = Field(None, description="Minimum sodium in grams per serving.")
     max_sodium: Optional[float] = Field(None, description="Maximum sodium in grams per serving.")
 
-    # --- Result control ---
-    max_results: int = Field(10, description="Maximum number of results to return.")
+    max_results: int = Field(3, description="Maximum number of results to return.")
 
 
 # ── Elasticsearch query builder ───────────────────────────────────────────────
@@ -181,7 +177,7 @@ class RecipeSearchTool(BaseTool):
         max_sugar: Optional[float] = None,
         min_sodium: Optional[float] = None,
         max_sodium: Optional[float] = None,
-        max_results: int = 10,
+        max_results: int = 3,
     ) -> List[dict]:
         params = RecipeSearchInput(
             title=title,
