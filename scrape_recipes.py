@@ -53,6 +53,17 @@ def parse_recipe(data,html,url):
     
     recipe["steps"] = steps
 
+    #extract image url
+    image = data.get("image", "")
+    if isinstance(image, str):
+        recipe["image"] = image
+    elif isinstance(image, list) and len(image) > 0:
+        recipe["image"] = image[0]
+    elif isinstance(image, dict) and "url" in image:
+        recipe["image"] = image["url"]
+    else:
+        recipe["image"] = ""
+
 # find nutrition fact and normalize values
 
     nutrition_fact = {}
