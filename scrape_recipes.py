@@ -12,6 +12,8 @@ def extract_jsonLD(html):
     soup = BeautifulSoup(html, "html.parser")
     for s in soup.find_all("script", type = "application/ld+json"):
         try:
+            if s.string is None:
+                continue
             data = json.loads(s.string)
 
             # if it is list type

@@ -31,6 +31,6 @@ with open("data/category_links.txt", "w", encoding="utf-8") as f:
     for a in ingredients:
         href = a.get("href")
         if href:
-            f.write(href + "\n")
+            f.write(str(href) + "\n")
 
 print("Saved", len(ingredients), "category links.")
