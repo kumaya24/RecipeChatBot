@@ -1,4 +1,4 @@
-from langchain_ollama import OllamaLLM # Newest import
+from langchain_ollama import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
@@ -11,13 +11,18 @@ def get_session_history(session_id: str):
     return store[session_id]
 
 class RecipeAssistant:
-    def __init__(self, raw_recipe_text):
-        # Use the updated class name
-        self.llm = OllamaLLM(model="llama3.1") 
+    def __init__(self, raw_recipe_text: str):
+        self.llm         = OllamaLLM(model="llama3.1")
         self.recipe_text = raw_recipe_text
-        
+
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a chef. Answer based ONLY on this recipe:\n\n{recipe_content}"),
+            ("system",
+             "You are a helpful chef assistant. "
+             "Answer questions based on the recipe below.\n\n"
+             "{recipe_content}\n\n"
+             "If the user's message selected this recipe AND asked a question "
+             "(e.g. 'I'll take the first one, what are its ingredients?'), "
+             "skip any acknowledgement and just answer the question directly."),
             MessagesPlaceholder(variable_name="history"),
             ("human", "{input}"),
         ])
@@ -30,13 +35,11 @@ class RecipeAssistant:
             history_messages_key="history",
         )
 
-    def ask(self, user_question: str, session_id: str):
+    def ask(self, user_question: str, session_id: str) -> str:
         return self.brain.invoke(
             {"input": user_question},
-            config={"configurable": {"session_id": session_id}}
+            config={"configurable": {"session_id": session_id}},
         )
-
-
 
 
 if __name__ == "__main__":
