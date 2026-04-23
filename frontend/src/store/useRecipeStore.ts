@@ -19,6 +19,7 @@ interface RecipeStore {
   // Handle the API request and response
   createChatSession: (newPrompt: Prompt) => Promise<Response>;
   fetchChat: (chatPrompt: ChatPrompt) => Promise<Response>;
+  clearBackendSession: (sessionId: string) => Promise<Response>;
 }
 
 export const useRecipeStore = create<RecipeStore>((set) => ({
@@ -27,6 +28,7 @@ export const useRecipeStore = create<RecipeStore>((set) => ({
   initialRes: {
     summary: "",
     session_id: "",
+    recipe_cards: [],
   },
   sessionId: "",
   recipeText: "",
@@ -66,6 +68,15 @@ export const useRecipeStore = create<RecipeStore>((set) => ({
         message: chatPrompt.message,
         recipe_text: chatPrompt.recipeText,
       }),
+    });
+
+    return res;
+  },
+
+  // DELETE: clear the matching backend session
+  clearBackendSession: async (sessionId: string) => {
+    const res = await fetch(`/api/session/${sessionId}`, {
+      method: "DELETE",
     });
 
     return res;

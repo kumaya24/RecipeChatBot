@@ -175,6 +175,7 @@ class RecipeSearchTool(BaseTool):
             "servings":    src.get("servings"),
             "total_time":  src.get("total_time"),
             "source_url":  src.get("source_url"),
+            "image":       src.get("image") or src.get("image_url"),
             "ingredients": src.get("ingredients", []),
             "steps":       src.get("steps", []),
             "nutrition": {

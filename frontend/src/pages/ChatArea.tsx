@@ -9,6 +9,7 @@ import type {
   SearchResponse,
   ChatPrompt,
   ChatResponse,
+  RecipeCard,
 } from "@/types/type";
 import { toast } from "sonner";
 import { useRecipeStore } from "@/store/useRecipeStore";
@@ -27,10 +28,13 @@ type Msg = {
   id: string;
   role: Role;
   content: string;
+  recipeCards?: RecipeCard[];
   createdAt: number;
 };
 
 const STARTER_MESSAGE = "What kind of recipe are you looking for?";
+const RECIPE_CHOICE_MESSAGE =
+  "Which recipe would you like to explore? Pick one, or click the refresh button to try a different set.";
 
 function createStarterMessage(): Msg {
   return {
@@ -85,13 +89,16 @@ const ChatArea = () => {
       let searchRes: SearchResponse = {
         summary: "",
         session_id: "",
+        recipe_cards: [],
       };
 
       let chatRes: ChatResponse = {
         answer: "",
+        recipe_cards: [],
       };
 
       let replyText = "";
+      let replyCards: RecipeCard[] = [];
 
       try {
         const currentSessionId = useRecipeStore.getState().sessionId;
@@ -103,6 +110,7 @@ const ChatArea = () => {
           if (sessionRes.ok) {
             searchRes = await sessionRes.json();
             replyText = searchRes.summary;
+            replyCards = searchRes.recipe_cards ?? [];
             setSessionId(searchRes.session_id);
             setRecipeText(searchRes.summary);
           } else {
@@ -122,6 +130,7 @@ const ChatArea = () => {
           if (chatBotRes.ok) {
             chatRes = await chatBotRes.json();
             replyText = chatRes.answer;
+            replyCards = chatRes.recipe_cards ?? [];
           } else {
             replyText = `ERROR: Please check your session ID and payload.`;
           }
@@ -130,10 +139,21 @@ const ChatArea = () => {
           id: uid(),
           role: "assistant",
           content: replyText,
+          recipeCards: replyCards,
           createdAt: Date.now(),
         };
+        const replies = [reply];
 
-        setMessages((prev) => [...prev, reply]);
+        if (replyCards.length > 0) {
+          replies.push({
+            id: uid(),
+            role: "assistant",
+            content: RECIPE_CHOICE_MESSAGE,
+            createdAt: Date.now(),
+          });
+        }
+
+        setMessages((prev) => [...prev, ...replies]);
       } catch (err) {
         const reply: Msg = {
           id: uid(),
@@ -155,10 +175,24 @@ const ChatArea = () => {
     ],
   );
 
-  const refreshRecipeSearch = React.useCallback(() => {
+  const refreshRecipeSearch = React.useCallback(async () => {
     if (isThinking) return;
 
-    const { setPrompt, setSessionId, setRecipeText } = useRecipeStore.getState();
+    const {
+      clearBackendSession,
+      setPrompt,
+      setSessionId,
+      setRecipeText,
+    } = useRecipeStore.getState();
+    const currentSessionId = useRecipeStore.getState().sessionId;
+
+    try {
+      if (currentSessionId) {
+        await clearBackendSession(currentSessionId);
+      }
+    } catch (err) {
+      toast.error(`Backend session cleanup failed: ${(err as Error).message}`);
+    }
 
     setPrompt({ promptText: "" });
     setSessionId("");
@@ -318,9 +352,17 @@ function MessageRow({
         ) : (
           <div>
             <div className="rounded-2xl bg-gray-100 px-4 py-3 text-base leading-relaxed text-primary-foreground shadow-sm">
-              <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
-                {msg.content}
-              </div>
+              {!!msg.recipeCards?.length && (
+                <RecipeResponseWithImages
+                  content={msg.content}
+                  recipeCards={msg.recipeCards}
+                />
+              )}
+              {!msg.recipeCards?.length && (
+                <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
+                  {msg.content}
+                </div>
+              )}
               <div className="mt-2 text-[11px] text-muted-foreground">
                 {formatTime(msg.createdAt)}
               </div>
@@ -350,6 +392,105 @@ function MessageRow({
       </div>
     </div>
   );
+}
+
+function RecipeResponseWithImages({
+  content,
+  recipeCards,
+}: {
+  content: string;
+  recipeCards: RecipeCard[];
+}) {
+  const lines = content.split("\n");
+  const { introLines, recipeSections } = splitRecipeResponse(lines);
+
+  return (
+    <div className="text-base leading-relaxed text-foreground">
+      {introLines.map((line, index) => (
+        <div className="whitespace-pre-wrap" key={`intro-${index}`}>
+          {line || "\u00A0"}
+        </div>
+      ))}
+      {recipeSections.map((section, index) => {
+        const recipeCard = findRecipeForSection(section, recipeCards, index);
+
+        return (
+          <div key={`recipe-${index}`} className="mt-3">
+            {section.map((line, lineIndex) => (
+              <div className="whitespace-pre-wrap" key={`${index}-${lineIndex}`}>
+                {line || "\u00A0"}
+              </div>
+            ))}
+            {recipeCard?.image_url && <RecipeImage recipeCard={recipeCard} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RecipeImage({ recipeCard }: { recipeCard: RecipeCard }) {
+  return (
+    <img
+      src={recipeCard.image_url}
+      alt={recipeCard.title || "Recipe image"}
+      className="my-3 h-auto max-h-52 w-full max-w-md rounded-xl object-contain"
+      loading="lazy"
+    />
+  );
+}
+
+function splitRecipeResponse(lines: string[]) {
+  const introLines: string[] = [];
+  const recipeSections: string[][] = [];
+
+  for (const line of lines) {
+    if (looksLikeRecipeStart(line)) {
+      recipeSections.push([line]);
+      continue;
+    }
+
+    const currentSection = recipeSections[recipeSections.length - 1];
+    if (currentSection) {
+      currentSection.push(line);
+    } else {
+      introLines.push(line);
+    }
+  }
+
+  return { introLines, recipeSections };
+}
+
+function findRecipeForSection(
+  section: string[],
+  recipeCards: RecipeCard[],
+  fallbackIndex: number,
+) {
+  const normalizedSection = normalizeRecipeText(section.join(" "));
+  const matchingRecipe = recipeCards.find((recipeCard) => {
+    const normalizedTitle = normalizeRecipeText(recipeCard.title);
+
+    return (
+      !!recipeCard.image_url &&
+      !!normalizedTitle &&
+      normalizedSection.includes(normalizedTitle)
+    );
+  });
+
+  return matchingRecipe ?? recipeCards[fallbackIndex];
+}
+
+function normalizeRecipeText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/^[\s\d.):-]+/, "")
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikeRecipeStart(value: string) {
+  return /^\s*\d+[.)-]\s+\S/.test(value);
 }
 
 const ThinkingRow = () => {
